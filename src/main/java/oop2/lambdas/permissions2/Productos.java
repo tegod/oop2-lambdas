@@ -1,7 +1,7 @@
 package oop2.lambdas.permissions2;
 
-import java.util.Collections;
 import java.util.List;
+import java.util.function.Supplier;
 
 public class Productos {
     public static final String SIN_PERMISOS = "No tiene los permisos necesarios";
@@ -13,25 +13,23 @@ public class Productos {
         this.productos = productos;
     }
 
-    public void addProducto(String userId, Producto producto) {
-        if (!this.security.checkAddPermission(userId)) {
+    private <T> T extracted(Supplier<Boolean> CheckIf, Supplier<T> runnable) {
+        if (!CheckIf.get()) {
             throw new RuntimeException(SIN_PERMISOS);
         }
-        this.productos.add(producto);
+        return runnable.get();
+    }
+
+    public void addProducto(String userId, Producto producto) {
+        extracted(() -> this.security.checkAddPermission(userId), () -> this.productos.add(producto));
     }
 
     public void removeProducto(String userId, Producto producto) {
-        if (!this.security.checkRemovePermission(userId)) {
-            throw new RuntimeException(SIN_PERMISOS);
-        }
-        this.productos.remove(producto);
+        extracted(() -> this.security.checkRemovePermission(userId), () -> this.productos.remove(producto));
     }
 
     public List<Producto> listAll(String userId) {
-        if (!this.security.checkListPermission(userId)) {
-            throw new RuntimeException(SIN_PERMISOS);
-        }
-        return Collections.unmodifiableList(this.productos);
+        return extracted(() -> this.security.checkListPermission(userId), () -> this.productos);
     }
 
     int cantidad() {

@@ -5,6 +5,11 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
+@FunctionalInterface
+interface SQLconsumer {
+    void conectar(Connection conn) throws SQLException;
+}
+
 public class Usuarios {
 
     private final String jdbcUrl;
@@ -13,39 +18,41 @@ public class Usuarios {
         this.jdbcUrl = jdbcUrl;
     }
 
-    public void insertar(String nombre, String email) {
-        try (Connection connection = DriverManager.getConnection(this.jdbcUrl);
-             PreparedStatement statement = connection.prepareStatement("INSERT INTO usuarios (nombre, email) VALUES (?, ?)")) {
+    private void gestionConeccion(SQLconsumer c, String mensaje) {
+        try (Connection connection = DriverManager.getConnection(this.jdbcUrl)) {
             connection.setAutoCommit(false);
-            statement.setString(1, nombre);
-            statement.setString(2, email);
+
+            c.conectar(connection);
+
             try {
-                statement.executeUpdate();
                 connection.commit();
             } catch (SQLException e) {
                 connection.rollback();
-                throw new RuntimeException("Error al insertar usuario", e);
+                throw new RuntimeException(mensaje, e);
             }
         } catch (SQLException e) {
-            throw new RuntimeException("Error al insertar usuario", e);
+            throw new RuntimeException(mensaje, e);
         }
     }
 
-    public void actualizarEmail(int id, String nuevoEmail) {
-        try (Connection connection = DriverManager.getConnection(this.jdbcUrl);
-             PreparedStatement statement = connection.prepareStatement("UPDATE usuarios SET email = ? WHERE id = ?")) {
-            connection.setAutoCommit(false);
-            statement.setString(1, nuevoEmail);
-            statement.setInt(2, id);
-            try {
+    public void insertar(String nombre, String email) {
+        gestionConeccion(conn -> {
+            try (PreparedStatement statement = conn.prepareStatement("INSERT INTO usuarios (nombre, email) VALUES (?, ?)")) {
+                statement.setString(1, nombre);
+                statement.setString(2, email);
                 statement.executeUpdate();
-                connection.commit();
-            } catch (SQLException e) {
-                connection.rollback();
-                throw new RuntimeException("Error al actualizar usuario", e);
             }
-        } catch (SQLException e) {
-            throw new RuntimeException("Error al actualizar usuario", e);
-        }
+        }, "Error al insertar usuario");
+
+    }
+
+    public void actualizarEmail(int id, String nuevoEmail) {
+        gestionConeccion(conn -> {
+            try (PreparedStatement statement = conn.prepareStatement("UPDATE usuarios SET email = ? WHERE id = ?")) {
+                statement.setString(1, nuevoEmail);
+                statement.setInt(2, id);
+                statement.executeUpdate();
+            }
+        }, "Error al actualizar usuario");
     }
 }
